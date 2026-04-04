@@ -102,4 +102,4 @@ Row │ LayersMin  LayersMax  Population  MeanFitness  MaxFitness  SuccessfulSim
 16 │         2          2         100     0.865625     0.9375                       0
 17 │         1          2          75     0.865625     0.9375                       0
 18 │         1          1          75     0.865625     0.9375                       0
-""
+"""

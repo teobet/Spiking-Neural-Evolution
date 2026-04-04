@@ -69,7 +69,7 @@ module SNPCircuit
         layers::Vector{LayerOfNeurons}
     end
 
-
+    # TODO Function,Var --> function,var (secondo convenzione)
     """
     NumberOfLayers(circuit)
 
@@ -120,7 +120,7 @@ module SNPCircuit
         TotalNumberOfSpikes::UInt64 = sigma.number_of_spikes
         for i in sigma.input_lines
             if input_vector[i]
-              TotalNumberOfSpikes += 1
+                TotalNumberOfSpikes += 1
             end
         end
         # Checks whether the corresponding rule exists
@@ -128,6 +128,7 @@ module SNPCircuit
             sigma.number_of_spikes = 0
             return true
         else
+            # INFO perché le conserva?
             sigma.number_of_spikes = TotalNumberOfSpikes
             return false
         end
@@ -156,10 +157,10 @@ module SNPCircuit
 
     
     """
-    EvaluateLayerOfNeurons(layer, input_vector)
+    EvaluateCircuitOfNeurons(circuit, input_vector)
 
-    Given an input vector, compute the output and the new internal
-    state of each neuron in the circuit.
+    Given the input vector of the first layer, compute the output and the new 
+    internal state of each neuron in every layer of the circuit.
 
     # Arguments
     - `circuit::CircuitOfNeurons`: The considered circuit.
@@ -189,38 +190,35 @@ module SNPCircuit
     # Arguments
     - `inputs::UInt16`: The number of inputs fed to the circuit.
     - `outputs::UInt16`: The number of output spikes of the circuit.
-    - `min_layers::UInt16`: The minimum number of hidden layers.
-    - `max_layers::UInt16`: The maximum number of hidden layers.
+    - `min_layers::UInt16`: The minimum number of hidden layers (1 by default). 
+    - `max_layers::UInt16`: The maximum number of hidden layers (2 by default).
 
     # Returns
     - `Vector{Bool}`: a vector of output spikes of the circuit`.
     """
-    function GenerateRandomCircuit(inputs::UInt16, outputs::UInt16, min_layers = 1, max_layers = 2)
+    function GenerateRandomCircuit(inputs::UInt16, outputs::UInt16, min_layers::UInt16 = 0x0001, max_layers::UInt16 = 0x0002)
         # This variable refers to the number of hidden layers
-        n_layers = rand((min_layers:max_layers))
+        n_layers = rand(min_layers:max_layers)
         
         layers = Vector{LayerOfNeurons}()
         
         # Hidden layers
-        for n_layer in 1:n_layers
-
-            # We assume that, when generating a randon network, each layer will contain x \in [n, n+2] 
-            # neurons, where n is the number of neurons of the previous layer
-            if n_layer == 1
-                n_neurons = rand((inputs : inputs + 2))
+        for i in 1:n_layers
+            # We assume that, when generating a random network, each layer will contain 
+            # x \in {n, n + 1, n + 2} neurons, where n is the number of neurons of the previous layer
+            if i == 1
+                previous_inputs = inputs
             else
-                n_neurons = rand((NumberOfNeurons(layers[n_layer - 1]) : NumberOfNeurons(layers[n_layer - 1]) + 2))
+                previous_inputs = NumberOfNeurons(layers[i - 1])
             end
+
+            n_neurons = rand(previous_inputs:(previous_inputs + 2))
 
             neurons = Vector{Neuron}()
 
-            for n_neuron in 1:n_neurons
+            for _ in 1:n_neurons
                 # Each neuron has random {rules, input_lines, number_of_spikes}
-                if n_layer == 1
-                    push!(neurons, GenerateRandomNeuron(inputs))
-                else
-                    push!(neurons, GenerateRandomNeuron(NumberOfNeurons(layers[n_layer - 1])))
-                end
+                push!(neurons, GenerateRandomNeuron(previous_inputs)) 
             end
             
             push!(layers, LayerOfNeurons(neurons))
@@ -232,13 +230,12 @@ module SNPCircuit
 
         neurons = Vector{Neuron}()
                 
-        for n_neuron in 1:outputs
+        for _ in 1:outputs
             push!(neurons, GenerateRandomNeuron(NumberOfNeurons(layers[end])))
         end
-            
+
         push!(layers, LayerOfNeurons(neurons))
-                
-        
+
         return CircuitOfNeurons(layers)
     end
        
@@ -260,21 +257,15 @@ module SNPCircuit
     # Returns
     - `Neuron`: the randmoly generated neuron`.
     """
-    function GenerateRandomNeuronOld(inputs::UInt16)
-        # Enumerating all the possible input_lines, and random permute them
-        possible_input_lines = randperm(length(collect(1:inputs)))
-
-        # Sample a number of input_lines to be chosen
+    function GenerateRandomNeuronNew(inputs::UInt16)
+        # Permuting the enumeration of all the possible input lines and selecting a (sub)set of them
+        possible_input_lines = randperm(inputs)
         num_input_lines = rand(1:length(possible_input_lines))
-
-        # Select a (sub)set of the input lines
-        possible_input_lines = collect(1:inputs)[possible_input_lines[1:num_input_lines]]
+        possible_input_lines = possible_input_lines[1:num_input_lines]
             
-        # The same is performed on the rules
-        possible_rules = randperm(length(collect(0:inputs))) .- 1
-
+        # The same is performed on the rules, also considering (a0 -> a), therefore the `.- 1``
+        possible_rules = randperm(inputs + 1) .- 1
         num_rules = rand(1:length(possible_rules))
-
         possible_rules = possible_rules[1:num_rules]
 
         return Neuron(possible_rules, possible_input_lines, 0)
@@ -282,93 +273,86 @@ module SNPCircuit
 
     function GenerateRandomNeuron(inputs::UInt16)
         possible_input_lines = randperm(length(collect(1:inputs)))
-    
+
         num_input_lines = rand(1:length(possible_input_lines))
-    
+
         possible_input_lines = collect(1:inputs)[possible_input_lines[1:num_input_lines]]
-        
+
         possible_rules = randperm(length(collect(1:15)))
-    
+
         num_rules = rand(1:length(possible_rules))
-    
+
         possible_rules = collect(1:15)[possible_rules[1:num_rules]]
 
         #if rand() > 0.5
         #    push!(possible_rules, 0)
         #end
-    
+
         return Neuron(possible_rules, possible_input_lines, 0)
     end
 
     """
-    PrintNeuron(neuron)
+    Base.show(io, neuron)
 
     Prints the content of a neuron
 
     # Arguments
+    - `io::IO`: The I/O stream to render to.
     - `neuron::Neuron`: The neuron to be printed
 
     # Examples
     ```julia
     println(neuron)
+    ```
     """
-    function PrintNeuron(neuron::Neuron)
+    function Base.show(io::IO, neuron::Neuron)
+        # Prints the general informations of the neuron
         print(io, "    Neuron\n")
-        print("      Rules: {")
-        for i in 1 : length(neuron.rules)
-            print(string(sort(neuron.rules)[i]))
+
+        # Proceedes with printing the rules of the neuron
+        print(io, "      Rules: {")
+        for i in 1:length(neuron.rules)
+            print(io, string(sort(neuron.rules)[i]))
             if i < length(neuron.rules)
-                print(", ")
+                print(io, ", ")
             end
         end
-        print("}\n      Input lines: {")
-        for i in 1 : length(neuron.input_lines)
-            print(string(sort(neuron.input_lines)[i]))
+
+        # Finally, prints the input lines to which the neuron is connected
+        print(io, "}\n      Input lines: {")
+        for i in 1:length(neuron.input_lines)
+            print(io, string(sort(neuron.input_lines)[i]))
             if i < length(neuron.input_lines)
-                print(", ")
+                print(io, ", ")
             end
         end
-        print("}")
+        print(io, "}\n")
     end
     
     """
-    PrintLayer (layer)
+    Base.show(io, layer)
 
     Prints the content of a layer of neurons
 
     # Arguments
+    - `io::IO`: The I/O stream to render to.
     - `layer::LayerOfNeurons`: The layer to be printed
 
     # Examples
     ```julia
     println(layer)
+    ```
     """
-    function PrintLayer(layer::LayerOfNeurons)
-        print(io, "  Layer (" * string(length(layer.neurons)) * " neurons)\n")
+    function Base.show(io::IO, layer::LayerOfNeurons)
+        # Prints the general informations of the layer
+        print(io, "  Layer (" * string(NumberOfNeurons(layer)) * " neurons)\n")
+
+        # Proceedes with printing the inner content of the neurons
         for neuron in layer.neurons
-            PrintNeuron(neuron) 
+            print(io, neuron) 
         end
     end
     
-    """
-    PrintCircuit (circuit)
-
-    Prints the content of a circuit of neurons
-
-    # Arguments
-    - `circuit::CircuitOfNeurons`: The circuit to be printed
-
-    # Examples
-    ```julia
-    println(circuit)
-    """
-    function PrintCircuit(circuit::CircuitOfNeurons)
-        println(io, "Circuit (" * string(length(circuit.layers)) * " layers)")
-        for layer in circuit.layers
-            PrintLayer(layer) 
-        end
-    end
-
     """
     Base.show(io, circuit)
 
@@ -380,10 +364,17 @@ module SNPCircuit
 
     # Examples
     ```julia
-    println(circuit)
+    print(circuit)
+    ```
     """
     function Base.show(io::IO, circuit::CircuitOfNeurons)
-        println(io, "Circuit (" * string(length(circuit.layers)) * " layers)")
+        # Prints the general informations of the circuit
+        println(io, "Circuit (" * string(NumberOfLayers(circuit)) * " layers)")
+
+        # Proceedes with printing the inner content of the layers
+        for layer in circuit.layers
+            print(io, layer)
+        end
     end
 
 end #Module

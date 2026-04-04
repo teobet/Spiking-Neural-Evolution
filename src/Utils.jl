@@ -6,6 +6,7 @@ other modules
 
 """
 
+# TODO general review
 module Utils
     using Combinatorics
 
@@ -36,7 +37,8 @@ module Utils
         remove_neuron::Float64
         new_rule::Float64
         remove_rule::Float64
-        random_input_lines::Float64
+        new_input_line::Float64
+        remove_input_line::Float64
     end
 
     """ 
@@ -58,11 +60,11 @@ module Utils
             # If the value of input line is larger than the number of inputs,
             # than this line is considered invalid (and should be removed)
             if input_line > inputs
-                push!(d, input_line) 
+                push!(d, input_line)
             end
         end
 
-        return d 
+        return d
     end
 
     """

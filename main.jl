@@ -7,6 +7,5 @@ function XOR(inputs::Vector{Bool})
     return reduce(xor, inputs)
 end
 
-histories = Evolve(XOR, UInt16(5))
+histories = Evolve(XOR, 0x005, true)
 
-plot(histories)
