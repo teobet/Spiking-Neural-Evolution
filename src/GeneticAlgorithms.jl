@@ -21,10 +21,6 @@ module GeneticAlgorithms
         Mutation,
         Fitness,
         CleanCircuit,
-        CrossoverNew,
-        MutationNew,
-        FitnessNew,
-        CleanCircuitNew,
         ProportionateSelection
 
 
@@ -48,32 +44,38 @@ module GeneticAlgorithms
     """
 
     #TODO extend considering multiple outputs
-    function CrossoverNew(circuit1::CircuitOfNeurons, circuit2::CircuitOfNeurons, examples::Vector{Vector{Bool}}, labels::Vector{Bool})
+    function Crossover(circuit1::CircuitOfNeurons, circuit2::CircuitOfNeurons, examples::Vector{Vector{Bool}}, labels::Vector{Vector{Bool}})
         # If the parent circuits are not eligible for the crossover (less than 2 layers),
         # the following 2 lines prevent errors from being raised, then returning both of the parents as is
         child1 = circuit1
         child2 = circuit2
 
         if (NumberOfLayers(circuit1) > 2 && NumberOfLayers(circuit2) > 2)
-            # Between p \in [0.4,0.6] is taken from the first parent and 1 - p
-            # is taken from the second one
+            # Both parents are "split" by p \in [0.4,0.6], identifying m and n
+            # which indicate the number of layers before the split line
             slice = 0.4 + ((0.6 - 0.4) * rand())
-            n = UInt16(floor(slice * NumberOfLayers(circuit1)))   
-            m = NumberOfLayers(circuit2) - UInt16(floor((1 - slice) * NumberOfLayers(circuit2)))
+            n = UInt16(floor(slice * NumberOfLayers(circuit1)))
+            m = UInt16(floor(slice * NumberOfLayers(circuit2)))
 
-            # The offsprings will contain the layers [1:n] from the first
-            # circuit, and the layers [m:end] from the second circuit and
-            child1 = CircuitOfNeurons(append!(
-                deepcopy(circuit1.layers[1:n]), 
-                deepcopy(circuit2.layers[m:end])))
+            # The offsprings will contain the first n layers of the first circuit
+            # and the last |circuit2| - m layers of the second circuit and viceversa, for example:
+            # given     circuit1 = [*   *   * | *   *], circuit2 = [@   @ | @   @]
+            # we obtain child1   = [*   *   *   @   @], child2   = [@   @   *   *]
+            child1 = CircuitOfNeurons(vcat(
+                deepcopy(circuit1.layers[1:n]),
+                deepcopy(circuit2.layers[(m + 1):end])
+            ))
 
-            child2 = CircuitOfNeurons(append!(
-                deepcopy(circuit2.layers[1:m]), 
-                deepcopy(circuit1.layers[n:end])))
+            child2 = CircuitOfNeurons(vcat(
+                deepcopy(circuit2.layers[1:m]),
+                deepcopy(circuit1.layers[(n + 1):end])
+            ))
+
         end
 
-        child1 = CleanCircuitNew(child1, UInt16(length(examples[1])), UInt16(length(labels[1])))
-        child2 = CleanCircuitNew(child2, UInt16(length(examples[1])), UInt16(length(labels[1])))
+        # We clean both the child circuits
+        child1 = CleanCircuit(child1, UInt16(length(examples[1])), UInt16(length(labels[1])))
+        child2 = CleanCircuit(child2, UInt16(length(examples[1])), UInt16(length(labels[1])))
 
         # We chose the child circuit with the highest fitness
         if Fitness(child1, examples, labels) >= Fitness(child2, examples, labels)
@@ -82,36 +84,6 @@ module GeneticAlgorithms
             return child2
         end
     end
-
-    function Crossover(circuit1::CircuitOfNeurons, circuit2::CircuitOfNeurons, examples::Vector{Vector{Bool}}, labels::Vector{Bool})
-    # Between 30% and 70% taken from the first parent
-    slice = rand(3:7) / 10
-
-    n = Int64(floor(slice * NumberOfLayers(circuit1)))
-
-    if n == 0
-        n = 1
-    end
-
-    # And 1 - n taken from the second parent
-    m = NumberOfLayers(circuit2) - Int64(floor((1 - slice) * NumberOfLayers(circuit2)))
-
-    if m == NumberOfLayers(circuit2)
-        m = NumberOfLayers(circuit2) - 1
-    end
-
-    # The merged circuit will contain the layers [1:n] from the first
-    # circuit, and the layers [m:end] from the second circuit
-    individual = CircuitOfNeurons(append!(
-        deepcopy(circuit1.layers[1:n]),
-        deepcopy(circuit2.layers[m:end])))
-
-    # Notice that this procedure can break some connection between neurons, therefore
-    # a 'cleaning' procedure is executed in the middle layer in order to remove empty input lines
-    individual = CleanCircuit(individual, UInt16(length(examples[1])), UInt16(length(labels[1])))
-
-    return individual
-end
 
     """
     Mutation(circuit, inputs, probabilities)
@@ -138,10 +110,9 @@ end
     # Returns
     - `CircuitOfNeurons`: A new individual obtained by performing the crossover`.
     """
-    function MutationNew(circuit::CircuitOfNeurons, inputs::UInt16, probabilities=MutationProbabilities(0.01, 0.08, 0.03, 0.2, 0.005, 0.08, 0.01, 0.01))
+    function Mutation(circuit::CircuitOfNeurons, inputs::UInt16, probabilities=MutationProbabilities(0.01, 0.08, 0.03, 0.2, 0.005, 0.08, 0.01, 0.01))
         # Adds a new layer
         if rand() < probabilities.new_layer
-            
             # For circuit of exactly 2 layers, the second one (output layer) will always be selected
             index = rand(2:NumberOfLayers(circuit))
             
@@ -264,103 +235,6 @@ end
         return circuit
     end
 
-    function Mutation(circuit::CircuitOfNeurons, inputs::UInt16, probabilities=MutationProbabilities(0.01, 0.08, 0.03, 0.2, 0.005, 0.08, 0.01))
-        # Adds a new layer
-        if rand() < probabilities.new_layer
-
-            if length(circuit.layers) == 2
-                # TODO check questo due e commenta sta roba
-                index = 2
-            else
-                index = rand(2:length(circuit.layers))
-            end
-
-            n_neurons = length(circuit.layers[index].neurons)
-
-            neurons = Vector{Neuron}()
-
-            for n_neuron in 1:n_neurons
-                push!(neurons, GenerateRandomNeuron(NumberOfNeurons(circuit.layers[index-1])))
-            end
-
-            insert!(circuit.layers, index, LayerOfNeurons(neurons))
-        end
-
-        # Remove a random layer (if the number of layers is greater than two)
-        if rand() < probabilities.remove_layer
-            if NumberOfLayers(circuit) > 2
-                deleteat!(circuit.layers, rand(2:(length(circuit.layers) - 1)))
-            end
-        end
-
-        # All the mutations on the neurons are tested for each layer
-        for i in 1:length(circuit.layers)-1
-            layer = circuit.layers[i]
-
-            # Insert a new random neuron  
-            if rand() < probabilities.new_neuron
-                if i == 1
-                    neuron = GenerateRandomNeuron(inputs)
-                    insert!(layer.neurons, rand(1:length(layer.neurons)), neuron)
-                else
-                    neuron = GenerateRandomNeuron(NumberOfNeurons(circuit.layers[i-1]))
-                    insert!(layer.neurons, rand(1:length(layer.neurons)), neuron)
-                end
-            end
-
-            # Remove a random neuron
-            if rand() < probabilities.remove_neuron
-                if length(layer.neurons) > 2
-                    index_remove = rand(1:length(layer.neurons))
-                    deleteat!(layer.neurons, index_remove)
-                end
-            end
-
-            # The mutations for the rules are tested for each neuron
-            for j in 1:NumberOfNeurons(circuit.layers[i])
-
-                # Remove a random rule
-                if rand() < probabilities.remove_rule
-                    if length(circuit.layers[i].neurons[j].rules) > 2
-                        index_remove = rand(1:length(circuit.layers[i].neurons[j].rules))
-                        deleteat!(circuit.layers[i].neurons[j].rules, index_remove)
-                    end
-                end
-
-                # Add a new random rule
-                if rand() < probabilities.new_rule
-                    #TODO migliora sta merda
-                    added = false
-                    while added == false
-                        rule = rand(1:100)
-                        if (rule in circuit.layers[i].neurons[j].rules) == false
-                            push!(circuit.layers[i].neurons[j].rules, rule)
-                            added = true
-                        end
-                    end
-                end
-
-                # Sample a new set of random input lines
-            if rand() < probabilities.new_input_line
-                    if i == 1
-                        previous_inputs = inputs
-                    else
-                        previous_inputs = NumberOfNeurons(circuit.layers[i-1])
-                    end
-
-                    possible_input_lines = randperm(length(collect(1:previous_inputs)))
-
-                    num_input_lines = rand(1:length(possible_input_lines))
-
-                    circuit.layers[i].neurons[j].input_lines = collect(1:previous_inputs)[possible_input_lines[1:num_input_lines]]
-                end
-            end
-
-        end
-
-        return circuit
-    end
-
     """
     CleanCircuit(c, inputs)
 
@@ -379,7 +253,7 @@ end
     """
 
     # TODO(cumentate) 
-    function CleanCircuitNew(c::CircuitOfNeurons, inputs::UInt16, outputs::UInt16)
+    function CleanCircuit(c::CircuitOfNeurons, inputs::UInt16, outputs::UInt16)
         # Cloning the input circuit for convenience reasons
         circuit = deepcopy(c)
 
@@ -433,89 +307,10 @@ end
             i = i + 1
         end
 
-        # TEST
-        for j in 1:NumberOfLayers(circuit)
 
-            if j == 1
-                previous_inputs = inputs
-            else
-                previous_inputs = NumberOfNeurons(circuit.layers[j-1])
-            end
-
-            for k in 1:NumberOfNeurons(circuit.layers[j])
-                for h in 1:length(circuit.layers[j].neurons[k].input_lines)
-                    if circuit.layers[j].neurons[k].input_lines[h] > previous_inputs
-                        throw(error("Found mismatch in input lines number AFTER CLEANING"))
-                        exit()
-                    end
-                end
-            end
-        end
-        # TEST
 
         return circuit
     end
-
-function CleanCircuit(c::CircuitOfNeurons, inputs::UInt16, outputs::UInt16)
-
-    # Cloning the input circuit for convenience reasons
-    circuit = deepcopy(c)
-
-    # Cleaning the first layer
-    for i in 1:NumberOfNeurons(circuit.layers[1])
-        circuit.layers[1].neurons[i].input_lines = filter(x -> x <= inputs, circuit.layers[1].neurons[i].input_lines)
-    end
-
-    # Cleaning the hidden layers
-    for i in 2:NumberOfLayers(circuit)-1
-        j = 1
-        while j <= NumberOfNeurons(circuit.layers[i])
-
-            # Enumerating all the input lines that does not connect to any previous neuron
-            unconnected = Differences(NumberOfNeurons(circuit.layers[i-1]),
-                circuit.layers[i].neurons[j].input_lines)
-
-
-            if length(unconnected) == length(circuit.layers[i].neurons[j].input_lines)
-                # If all the input lines are invalid, the whole neuron is removed
-                deleteat!(circuit.layers[i].neurons, j)
-            else
-                # Otherwise, only the invalid lines are removed
-                circuit.layers[i].neurons[j].input_lines =
-                    setdiff(circuit.layers[i].neurons[j].input_lines, unconnected)
-
-                j += 1
-
-            end
-        end
-
-        # If, after the clean, the layer has no neurons, adds a random neuron
-        if NumberOfNeurons(circuit.layers[i]) == 0
-            if i == 1
-                push!(circuit.layers[i].neurons, GenerateRandomNeuron(inputs))
-            else
-                push!(circuit.layers[i].neurons, GenerateRandomNeuron(NumberOfNeurons(circuit.layers[i-1])))
-            end
-        end
-    end
-
-    # The same cleaning operation is performed at the output layer
-    # TODO: Può essere inglobato sopra togliendo il -1?
-    for i in 1:NumberOfNeurons(circuit.layers[end])
-        unconnected = Differences(NumberOfNeurons(circuit.layers[end-1]),
-            circuit.layers[end].neurons[i].input_lines)
-
-        circuit.layers[end].neurons[i].input_lines = setdiff(circuit.layers[end].neurons[i].input_lines, unconnected)
-
-        if length(circuit.layers[end].neurons[i].input_lines) < 2
-            circuit.layers[end].neurons[i].input_lines = 1:NumberOfNeurons(circuit.layers[end-1])
-        end
-    end
-
-    #TODO Considera il caso in cui il layer rimane senza neuroni
-
-    return circuit
-end
 
     """
     Fitness(circuit, examples, labels)
@@ -534,14 +329,14 @@ end
     """
 
     #TODO extend considering multiple outputs
-    function Fitness(circuit::CircuitOfNeurons, examples::Vector{Vector{Bool}}, labels::Vector{Bool})
+    function Fitness(circuit::CircuitOfNeurons, examples::Vector{Vector{Bool}}, labels::Vector{Vector{Bool}})
         correct = 0
 
         # The circuit is cloned so that, at the end of evaluation, spikes are reset (TODO migliorabile)
         circuit_clone = deepcopy(circuit) 
 
         for i in 1:length(examples)
-            evaluation = EvaluateCircuitOfNeurons(circuit_clone, examples[i])[1]
+            evaluation = EvaluateCircuitOfNeurons(circuit_clone, examples[i])
             if evaluation == labels[i]
                 correct += 1 
             end

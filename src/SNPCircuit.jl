@@ -222,6 +222,7 @@ module SNPCircuit
             end
             
             push!(layers, LayerOfNeurons(neurons))
+
         end
                 
 
@@ -239,7 +240,6 @@ module SNPCircuit
         return CircuitOfNeurons(layers)
     end
        
-
     """
     GenerateRandomNeuron(inputs)
 
@@ -257,7 +257,7 @@ module SNPCircuit
     # Returns
     - `Neuron`: the randmoly generated neuron`.
     """
-    function GenerateRandomNeuronNew(inputs::UInt16)
+    function GenerateRandomNeuron(inputs::UInt16)
         # Permuting the enumeration of all the possible input lines and selecting a (sub)set of them
         possible_input_lines = randperm(inputs)
         num_input_lines = rand(1:length(possible_input_lines))
@@ -267,26 +267,6 @@ module SNPCircuit
         possible_rules = randperm(inputs + 1) .- 1
         num_rules = rand(1:length(possible_rules))
         possible_rules = possible_rules[1:num_rules]
-
-        return Neuron(possible_rules, possible_input_lines, 0)
-    end
-
-    function GenerateRandomNeuron(inputs::UInt16)
-        possible_input_lines = randperm(length(collect(1:inputs)))
-
-        num_input_lines = rand(1:length(possible_input_lines))
-
-        possible_input_lines = collect(1:inputs)[possible_input_lines[1:num_input_lines]]
-
-        possible_rules = randperm(length(collect(1:15)))
-
-        num_rules = rand(1:length(possible_rules))
-
-        possible_rules = collect(1:15)[possible_rules[1:num_rules]]
-
-        #if rand() > 0.5
-        #    push!(possible_rules, 0)
-        #end
 
         return Neuron(possible_rules, possible_input_lines, 0)
     end

@@ -35,10 +35,11 @@ module SpikingNeuralEvolution
         random_circuit_max_layers::UInt16
         stopping_criteria::StoppingCriteria
         percentage_of_examples::Float64
+        threshold::Float64
     end
 
     #TODO extend considering multiple outputs
-    function Simulate(examples::Vector{Vector{Bool}}, labels::Vector{Bool}, evolution_parameters::EvolutionParameters, mutation_probabilities::MutationProbabilities)
+    function Simulate(examples::Vector{Vector{Bool}}, labels::Vector{Vector{Bool}}, evolution_parameters::EvolutionParameters, mutation_probabilities::MutationProbabilities)
         # This array will contain the history of fitnesses
         max_fitness_history = []
            
@@ -51,6 +52,8 @@ module SpikingNeuralEvolution
     
         min_hidden_layers = evolution_parameters.random_circuit_min_layers
         max_hidden_layers = evolution_parameters.random_circuit_max_layers
+
+        threshold = evolution_parameters.threshold
         
         #TODO extend considering multiple outputs
         inputs = UInt16(length(examples[1]))
@@ -70,6 +73,7 @@ module SpikingNeuralEvolution
         
         max_iterations = evolution_parameters.iterations_per_simulation
         max_fitness = maximum(simulations.Fitness)
+
         
         sort!(simulations, :Fitness, rev = true)
 
@@ -80,7 +84,9 @@ module SpikingNeuralEvolution
         # The iteration in which the maximum (1 or threshold) fitness has been found
         iteration_of_max_fitness = -1
     
-        while iter < max_iterations
+        criterion = true
+
+        while criterion
         
             elitism_percentage = 0.10
     
@@ -88,7 +94,7 @@ module SpikingNeuralEvolution
     
             for _ in (elitism_percentage * population):population
                 
-                child = CrossoverNew(
+                child = Crossover(
                     simulations[ProportionateSelection(simulations.Fitness), :].Network, 
                     simulations[ProportionateSelection(simulations.Fitness), :].Network,
                     examples, 
@@ -123,11 +129,18 @@ module SpikingNeuralEvolution
                 best_circuit = deepcopy(simulations[1, :].Network)
             end
 
-            if max_fitness == 1 && iteration_of_max_fitness == -1
+            if max_fitness >= threshold && iteration_of_max_fitness == -1
                 iteration_of_max_fitness = iter
+                if evolution_parameters.stopping_criteria == Threshold
+                    criterion = false
+                end
             end
         
             iter += 1
+
+            if iter > max_iterations
+                criterion = false
+            end
         end
         
         return best_circuit, max_fitness_history, Int16(iteration_of_max_fitness), simulations
@@ -141,7 +154,7 @@ module SpikingNeuralEvolution
 
         # These vectors will contain all the combinations 2^inputs and the corresponding outputs
         examples = Vector{Vector{Bool}}()
-        labels = Vector{Bool}()
+        labels = Vector{Vector{Bool}}()
 
         # This line creates a vector containing all possible combinations (2^n) of _inputs_ bits
         combinations = reverse.(Iterators.product(fill(0:1, inputs)...))[:]
@@ -172,13 +185,15 @@ module SpikingNeuralEvolution
         end
 
         println("I found a circuit with " * string(NumberOfLayers(best_circuit)) * " layers with a fitness of $best_fitness")
+
         println(best_circuit)
 
         return executions
     end
 
     function Evolve(f::Function, inputs::UInt16, verbose::Bool = false)
-        return Evolve(f, 
+        return Evolve(
+            f, 
             inputs,
             EvolutionParameters(
                 UInt32(5),      # Simulations
@@ -188,7 +203,8 @@ module SpikingNeuralEvolution
                 UInt16(1),      # Min number of random hidden layers
                 UInt16(3),      # Max number of random hidden layers
                 MaxIterations,  # Stopping criteria
-                1               # Percentage of input combinations examples
+                1,              # Percentage of input combinations examples
+                1               # Threshold of near-optimal fitness
             ),
             MutationProbabilities(
                 0.008,  # New layer
@@ -209,15 +225,16 @@ module SpikingNeuralEvolution
             f, 
             UInt16(inputs),
             EvolutionParameters(
-                UInt32(5),     # Simulations
-                UInt32(1000),  # Iterations per simulation
-                UInt32(80),    # Min number of random population
-                UInt32(120),   # Max number of random population
-                UInt16(1),     # Min number of random hidden layers
-                UInt16(3),     # Max number of random hidden layers
-                MaxIterations, # Stopping criteria
-                1
-            ), 
+                UInt32(5),      # Simulations
+                UInt32(1000),   # Iterations per simulation
+                UInt32(80),     # Min number of random population
+                UInt32(120),    # Max number of random population
+                UInt16(1),      # Min number of random hidden layers
+                UInt16(3),      # Max number of random hidden layers
+                MaxIterations,  # Stopping criteria
+                1,              # Percentage of input combinations examples
+                1               # Threshold of near-optimal fitness
+            ),
             MutationProbabilities(
                 0.008,  # New layer
                 0.080,  # Remove layer

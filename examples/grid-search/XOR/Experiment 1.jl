@@ -34,7 +34,7 @@ results_ts = ThreadSafeDict()
             evolution_parameters = EvolutionParameters(
                 UInt32(15),    # How many simulations
                 UInt32(200),  # How many iterations per simulation
-                UInt32(population),    # Min number of random population
+                UInt32(population),    # Min number sof random population
                 UInt32(population),    # Max number of random population
                 UInt16(lay_min),   # Min number of random hidden layers
                 UInt16(lay_max),    # Max number of random hidden layers
