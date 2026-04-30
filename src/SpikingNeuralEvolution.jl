@@ -184,9 +184,9 @@ module SpikingNeuralEvolution
             end
         end
 
-        println("I found a circuit with " * string(NumberOfLayers(best_circuit)) * " layers with a fitness of $best_fitness")
+        # println("I found a circuit with " * string(NumberOfLayers(best_circuit)) * " layers with a fitness of $best_fitness")
 
-        println(best_circuit)
+        # println(best_circuit)
 
         return executions
     end
