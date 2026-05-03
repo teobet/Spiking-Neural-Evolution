@@ -1,4 +1,4 @@
-push!(LOAD_PATH, "../../src/")
+push!(LOAD_PATH, "../../../src/")
 
 using SpikingNeuralEvolution
 
@@ -9,42 +9,27 @@ using Random
 
 # Add workers (use all CPU cores except one)
 if nprocs() == 1
-    addprocs(32)
+    addprocs(Sys.CPU_THREADS - 1)
 end
 
 # Distribute code to all workers
 @everywhere begin
-    push!(LOAD_PATH, "../../src/")
+    push!(LOAD_PATH, "../../../src/")
     using SpikingNeuralEvolution
     using Statistics
 
     n = UInt16(5)
 
     function XOR(inputs::Vector{Bool})
-	return [reduce(xor, inputs)]
+	    return [reduce(xor, inputs)]
     end
 end
 
+# Extract previous 1000 results to rerun with 1000 iterations instead of 100, from "1.0 digest.csv"
+# convert "i | float float float float float float float float float float uint16" to (float float float float float float float float)
+file = readlines(open("1.0 digest.txt", "r"))
+combinations = [Tuple([parse(Float64, element) for element in (Vector{String}(split(split(strip(line), "│")[2]))[1:8])]) for line in file]
 
-
-function XOR(inputs::Vector{Bool})
-	return [reduce(xor, inputs)]
-end
-
-# Random search parameters
-num_random_samples = 50_000  # Change this to control how many random combinations to test
-
-# Generate random parameter combinations
-random_combinations = [(
-    rand() * 0.2,  # new_input
-    rand() * 0.2,  # remove_input
-    rand() * 0.2,  # new_rule
-    rand() * 0.2,  # remove_rule
-    rand() * 0.2,  # new_neuron
-    rand() * 0.2,  # remove_neuron
-    rand() * 0.2,  # new_layer
-    rand() * 0.2   # remove_layer
-) for _ in 1:num_random_samples]
 
 # Function to run a single evolution experiment
 @everywhere function run_evolution_experiment(params::Tuple)
@@ -53,7 +38,7 @@ random_combinations = [(
 
     evolution_parameters = EvolutionParameters(
         UInt32(15),    # How many simulations
-        UInt32(100),    # How many iterations per simulation
+        UInt32(1000),    # How many iterations per simulation, raised to 1000
         UInt32(80),    # Min number of random population
         UInt32(120),   # Max number of random population
         UInt16(1),     # Min number of random hidden layers
@@ -92,8 +77,8 @@ random_combinations = [(
 end
 
 # Run experiments in parallel using pmap
-println("Starting random search with $(nworkers()) workers on $(num_random_samples) parameter combinations...")
-results_list = pmap(run_evolution_experiment, random_combinations)
+println("Starting fitting with $(nworkers()) workers on previous 1000 parameter combinations...")
+results_list = pmap(run_evolution_experiment, combinations)
 
 # Convert results to DataFrame
 results = DataFrame(
@@ -116,7 +101,7 @@ end
 
 sort!(results, :MeanFitness, rev=true)
 
-println("\n=== Random Search Results ===")
+println("\n=== 1000 Iterations Results ===")
 println("Total experiments: $(nrow(results))")
 println("\nTop 1000 results by MeanFitness:")
 println(results[1:min(1000, nrow(results)), :])
