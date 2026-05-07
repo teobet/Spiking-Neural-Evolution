@@ -9,7 +9,7 @@ using Random
 
 # Add workers (use all CPU cores except one)
 if nprocs() == 1
-    addprocs(Sys.CPU_THREADS - 1)
+    addprocs(Sys.CPU_THREADS)
 end
 
 # Distribute code to all workers
@@ -27,12 +27,22 @@ end
 
 # Extract previous 1000 results to rerun with 1000 iterations instead of 100, from "1.0 digest.csv"
 # convert "i | float float float float float float float float float float uint16" to (float float float float float float float float)
-file = readlines(open("1.0 digest.txt", "r"))
-combinations = [Tuple([parse(Float64, element) for element in (Vector{String}(split(split(strip(line), "│")[2]))[1:8])]) for line in file]
-
+file = readlines(open("1.1 digest.txt", "r"))
+combinations = [[parse(Float64, element) for element in (Vector{String}(split(split(strip(line), "│")[2]))[1:8])] for line in file[1:15]]
+tuned_combinations = []
+for combination in combinations
+    for new in [-1.0, -0.005, 0.0, 0.005, 1.0]
+        for remove in [-1.0, -0.005, 0.0, 0.005, 1.0]
+            push!(tuned_combinations, [combination[1] + new, combination[2] + remove, combination[3:8]...])
+            push!(tuned_combinations, [combination[1:2]...,combination[3] + new, combination[4] + remove, combination[5:8]...])
+            push!(tuned_combinations, [combination[1:4]...,combination[5] + new, combination[6] + remove, combination[7:8]...])
+            push!(tuned_combinations, [combination[1:6]...,combination[7] + new, combination[8] + remove])
+        end
+    end
+end
 
 # Function to run a single evolution experiment
-@everywhere function run_evolution_experiment(params::Tuple)
+@everywhere function run_evolution_experiment(params::Union{Vector{Float64}, Vector{Float64}})
     new_layer, remove_layer, new_neuron, remove_neuron, new_rule, remove_rule, new_input, remove_input = params
 
     evolution_parameters = EvolutionParameters(
@@ -77,7 +87,7 @@ end
 
 # Run experiments in parallel using pmap
 println("Starting fitting with $(nworkers()) workers on previous 1000 parameter combinations...")
-results_list = pmap(run_evolution_experiment, combinations)
+results_list = pmap(run_evolution_experiment, tuned_combinations)
 
 # Convert results to DataFrame
 results = DataFrame(
