@@ -25,19 +25,21 @@ end
     end
 end
 
-# Extract previous 1000 results to rerun with 1000 iterations instead of 100, from "1.0 digest.csv"
 # convert "i | float float float float float float float float float float uint16" to (float float float float float float float float)
 file = readlines(open("1.1 digest.txt", "r"))
-combinations = [[parse(Float64, element) for element in (Vector{String}(split(split(strip(line), "│")[2]))[1:8])] for line in file[1:15]]
+combinations = [[parse(Float64, element) for element in (Vector{String}(split(split(strip(line), "│")[2]))[1:8])] for line in file[1:40]]
 tuned_combinations = []
 for combination in combinations
-    for new in [-1.0, -0.005, 0.0, 0.005, 1.0]
-        for remove in [-1.0, -0.005, 0.0, 0.005, 1.0]
-            push!(tuned_combinations, [combination[1] + new, combination[2] + remove, combination[3:8]...])
-            push!(tuned_combinations, [combination[1:2]...,combination[3] + new, combination[4] + remove, combination[5:8]...])
-            push!(tuned_combinations, [combination[1:4]...,combination[5] + new, combination[6] + remove, combination[7:8]...])
-            push!(tuned_combinations, [combination[1:6]...,combination[7] + new, combination[8] + remove])
-        end
+    for _ in 1:100
+        new_layer = max(0.0, combination[1] + ((rand() * 0.04) - 0.02))  # Randomly adjust by up to ±0.02
+        remove_layer = max(0.0, combination[2] + ((rand() * 0.04) - 0.02))
+        new_neuron = max(0.0, combination[3] + ((rand() * 0.04) - 0.02))
+        remove_neuron = max(0.0, combination[4] + ((rand() * 0.04) - 0.02))
+        new_rule = max(0.0, combination[5] + ((rand() * 0.04) - 0.02))
+        remove_rule = max(0.0, combination[6] + ((rand() * 0.04) - 0.02))
+        new_input = max(0.0, combination[7] + ((rand() * 0.04) - 0.02))
+        remove_input = max(0.0, combination[8] + ((rand() * 0.04) - 0.02))
+        push!(tuned_combinations, [new_layer, remove_layer, new_neuron, remove_neuron, new_rule, remove_rule, new_input, remove_input]) 
     end
 end
 
@@ -89,6 +91,26 @@ end
 println("Starting fitting with $(nworkers()) workers on previous 1000 parameter combinations...")
 results_list = pmap(run_evolution_experiment, tuned_combinations)
 
+# Add previous file results to the list
+splitted_strings = [Vector{String}(split(split(strip(line), "│")[2])) for line in file]
+for i in 1:length(splitted_strings)
+    push!(results_list, Tuple{Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, Float64, UInt16}(
+        [
+        parse(Float64, splitted_strings[i][1]),  # new_layer
+        parse(Float64, splitted_strings[i][2]),  # remove_layer
+        parse(Float64, splitted_strings[i][3]),  # new_neuron
+        parse(Float64, splitted_strings[i][4]),  # remove_neuron
+        parse(Float64, splitted_strings[i][5]),  # new_rule
+        parse(Float64, splitted_strings[i][6]),  # remove_rule
+        parse(Float64, splitted_strings[i][7]),  # new_input
+        parse(Float64, splitted_strings[i][8]),  # remove_input
+        parse(Float64, splitted_strings[i][9]),  # mean_fitness
+        parse(Float64, splitted_strings[i][10]), # max_fitness
+        parse(UInt16, splitted_strings[i][11]) # successful_simulations
+        ]
+    ))
+end
+    
 # Convert results to DataFrame
 results = DataFrame(
     NewLayer=Float64[],
