@@ -27,10 +27,10 @@ end
 
 
 
-evolution_parameters_combinations = Vector{Union{UInt32, UInt16}}()
+evolution_parameters_combinations = Vector()
 
 for population in [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
-    for min_hidden in [1, 2, 3, 4, 5]..
+    for min_hidden in [1, 2, 3, 4, 5]
         for max_hidden in [min_hidden, min_hidden + 1, min_hidden + 2, min_hidden + 3, min_hidden + 4]
             push!(evolution_parameters_combinations, [
                 UInt32(15),    # How many simulations
@@ -48,7 +48,7 @@ for population in [20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
 end
 
 # Function to run a single evolution experiment
-@everywhere function run_evolution_experiment(params::Vector{Union{UInt32, UInt16}})
+@everywhere function run_evolution_experiment(params::Vector)
 
     evolution_parameters = EvolutionParameters(
         params...
